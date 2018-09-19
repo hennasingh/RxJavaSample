@@ -14,6 +14,8 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
+    private Disposable mDisposable;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSubscribe(Disposable d) {
                 Log.d(TAG, "onSubscribe");
+                mDisposable = d;
             }
 
             @Override
@@ -60,5 +63,13 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "All items are emitted!");
             }
         };
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // don't send events once the activity is destroyed
+        mDisposable.dispose();
     }
 }
