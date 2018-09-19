@@ -4,13 +4,29 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.functions.Function;
-import io.reactivex.functions.Predicate;
 import io.reactivex.observers.DisposableObserver;
 import io.reactivex.schedulers.Schedulers;
+
+/**
+ * Basic Observable, Observer, Subscriber example
+ * Introduced CompositeDisposable and DisposableObserver
+ * The observable emits custom data type (Note) instead of primitive data types
+ * ----
+ * .map() operator is used to turn the note into all uppercase letters
+ * ----
+ * You can also notice we got rid of the below declarations
+ * Observable<Note> notesObservable = getNotesObservable();
+ * DisposableObserver<Note> notesObserver = getNotesObserver();
+ */
 
 public class MainActivity extends AppCompatActivity {
 
@@ -24,59 +40,28 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        //Observable
-        Observable<String> animalsObservable = getAnimalsObservable();
-
-        //Observer
-        DisposableObserver<String> animalsObserver = getAnimalsObserver();
-
-        DisposableObserver<String> animalsObserverAllCaps = getAnimalsAllCapsObserver();
-
-
-         //filter() is used to filter out the animal names starting with `b`
-
-        mCompositeDisposable .add(
-                animalsObservable
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .filter(new Predicate<String>() {
-                            @Override
-                            public boolean test(String s) throws Exception {
-                                return s.toLowerCase().startsWith("b");
-                            }
-                        })
-                        .subscribeWith(animalsObserver));
-
-
-          // filter() is used to filter out the animal names starting with 'c'
-         // map() is used to transform all the characters to UPPER case
-
-
-        mCompositeDisposable.add(
-                animalsObservable
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .filter(new Predicate<String>() {
-                            @Override
-                            public boolean test(String s) throws Exception {
-                                return s.toLowerCase().startsWith("c");
-                            }
-                        })
-                        .map(new Function<String, String>() {
-                            @Override
-                            public String apply(String s) throws Exception {
-                                return s.toUpperCase();
-                            }
-                        })
-                        .subscribeWith(animalsObserverAllCaps));
+        // add to Composite observable
+        // .map() operator is used to turn the note into all uppercase letters
+        mCompositeDisposable.add(getNotesObservable()
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(new Function<Note, Note>() {
+                    @Override
+                    public Note apply(Note note) throws Exception {
+                        // Making the note to all uppercase
+                        note.setNote(note.getNote().toUpperCase());
+                        return note;
+                    }
+                })
+                .subscribeWith(getNotesObserver()));
     }
 
-    private DisposableObserver<String> getAnimalsObserver() {
-        return new DisposableObserver<String>() {
+    private DisposableObserver<Note> getNotesObserver() {
+        return new DisposableObserver<Note>() {
 
             @Override
-            public void onNext(String s) {
-                Log.d(TAG, "Name: " + s);
+            public void onNext(Note note) {
+                Log.d(TAG, "Note: " + note.getNote());
             }
 
             @Override
@@ -86,46 +71,43 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onComplete() {
-                Log.d(TAG, "All items are emitted!");
+                Log.d(TAG, "All notes are emitted!");
             }
         };
     }
 
-    private DisposableObserver<String> getAnimalsAllCapsObserver() {
-        return new DisposableObserver<String>() {
+    private Observable<Note> getNotesObservable() {
+        final List<Note> notes = prepareNotes();
 
-
+        return Observable.create(new ObservableOnSubscribe<Note>() {
             @Override
-            public void onNext(String s) {
-                Log.d(TAG, "Name: " + s);
-            }
+            public void subscribe(ObservableEmitter<Note> emitter) throws Exception {
+                for (Note note : notes) {
+                    if (!emitter.isDisposed()) {
+                        emitter.onNext(note);
+                    }
+                }
 
-            @Override
-            public void onError(Throwable e) {
-                Log.e(TAG, "onError: " + e.getMessage());
+                if (!emitter.isDisposed()) {
+                    emitter.onComplete();
+                }
             }
-
-            @Override
-            public void onComplete() {
-                Log.d(TAG, "All items are emitted!");
-            }
-        };
+        });
     }
 
-    private Observable<String> getAnimalsObservable() {
-        return Observable.fromArray(
-                "Ant", "Ape",
-                "Bat", "Bee", "Bear", "Butterfly",
-                "Cat", "Crab", "Cod",
-                "Dog", "Dove",
-                "Fox", "Frog");
+    private List<Note> prepareNotes() {
+        List<Note> notes = new ArrayList<>();
+        notes.add(new Note(1, "buy tooth paste!"));
+        notes.add(new Note(2, "call brother!"));
+        notes.add(new Note(3, "watch narcos tonight!"));
+        notes.add(new Note(4, "pay power bill!"));
+
+        return notes;
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        // don't send events once the activity is destroyed
         mCompositeDisposable.clear();
     }
 }
